@@ -87,16 +87,19 @@ class Extension:
         self.conf = self.read_conf()
         self.index = []
 
-    def handle_query(self, query):
+    def find_results(self, query):
         q = query.string.strip().lower()
-        if len(q) < self.conf["min_length"]: return []
-        results = []
         for item in self.index:
-            if not query.isValid: return results
+            if not query.isValid: break
             pos = item.title.lower().find(q)
             if pos < 0: continue
             result = item.to_albert_item()
-            results.append((pos, result))
+            yield (pos, result)
+
+    def handle_query(self, query):
+        q = query.string.strip().lower()
+        if len(q) < self.conf["min_length"]: return []
+        results = list(self.find_results(query))
         results.sort(key=lambda x: x[0])
         return [x[1] for x in results]
 
