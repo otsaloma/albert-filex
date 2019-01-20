@@ -16,7 +16,7 @@ sudo apt install gir1.2-glib-2.0 python3-gi
 To install, run
 
 ```bash
-make PREFIX=/usr/local install
+sudo make PREFIX=/usr/local install
 ```
 
 Activate Filex in Albert's preferences under Extensions / Python /
