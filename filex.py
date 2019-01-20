@@ -54,24 +54,33 @@ class IndexItem:
             path_or_uri = urllib.parse.quote(path_or_uri)
             path_or_uri = "file://{}".format(path_or_uri)
         file = Gio.File.new_for_uri(path_or_uri)
+        self.path = file.get_path() or ""
+        self.uri = file.get_uri() or ""
         info = file.query_info("*", Gio.FileQueryInfoFlags.NONE, None)
-        self.title = info.get_display_name()
-        self.path = file.get_path()
-        self.uri = file.get_uri()
-        self.completion = self.get_completion()
-        self.icon = self.get_icon(info.get_icon().get_names())
+        self.title = info.get_display_name() or ""
+        self._icon = self.resolve_icon(info.get_icon().get_names())
 
     def __repr__(self):
         return "IndexItem(title={!r}, uri={!r})".format(self.title, self.uri)
 
-    def get_completion(self):
+    @property
+    def completion(self):
         if self.path:
             if os.path.isdir(self.path):
                 return self.path + os.sep
             return self.path
         return self.title
 
-    def get_icon(self, names):
+    @property
+    def icon(self):
+        if self.uri.startswith("trash://"):
+            # Avoid using an outdated empty/full icon for Trash.
+            file = Gio.File.new_for_uri(self.uri)
+            info = file.query_info("*", Gio.FileQueryInfoFlags.NONE, None)
+            return self.resolve_icon(info.get_icon().get_names())
+        return self._icon
+
+    def resolve_icon(self, names):
         for name in names:
             icon = albert.iconLookup(name)
             if icon: return icon
