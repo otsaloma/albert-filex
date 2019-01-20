@@ -89,7 +89,7 @@ class Extension:
 
     def handle_query(self, query):
         q = query.string.strip().lower()
-        if len(q) < 2: return []
+        if len(q) < self.conf["min_length"]: return []
         results = []
         for item in self.index:
             if not query.isValid: return results
@@ -105,6 +105,7 @@ class Extension:
         fname = os.path.join(directory, "filex.json")
         conf = self.read_json(fname, {}) or {}
         orig = conf.copy()
+        conf.setdefault("min_length", 1)
         conf.setdefault("paths", [os.path.expanduser("~/*")])
         conf.setdefault("scan_interval", 900)
         if conf != orig:
