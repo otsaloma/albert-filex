@@ -61,8 +61,7 @@ class IndexItem:
         self.icon = self.get_icon(info.get_icon().get_names())
 
     def __repr__(self):
-        return ("IndexItem(title={!r}, uri={!r})"
-                .format(self.title, self.uri))
+        return "IndexItem(title={!r}, uri={!r})".format(self.title, self.uri)
 
     def get_icon(self, names):
         for name in names:
