@@ -58,10 +58,18 @@ class IndexItem:
         self.title = info.get_display_name()
         self.path = file.get_path()
         self.uri = file.get_uri()
+        self.completion = self.get_completion()
         self.icon = self.get_icon(info.get_icon().get_names())
 
     def __repr__(self):
         return "IndexItem(title={!r}, uri={!r})".format(self.title, self.uri)
+
+    def get_completion(self):
+        if self.path:
+            if os.path.isdir(self.path):
+                return self.path + os.sep
+            return self.path
+        return self.title
 
     def get_icon(self, names):
         for name in names:
@@ -77,7 +85,7 @@ class IndexItem:
             icon=self.icon,
             text=self.title,
             subtext=self.path or self.uri,
-            completion=self.title,
+            completion=self.completion,
             urgency=albert.ItemBase.Normal,
             actions=[albert.UrlAction("Open", self.uri)],
         )
@@ -90,20 +98,38 @@ class Extension:
         self.index = []
 
     def find_results(self, query):
+        if os.path.isdir(os.path.split(query.string)[0]):
+            # If query is a full path, list all matching directory
+            # contents whether they are indexed or not.
+            yield from self.find_results_dir(query)
+            return
         q = query.string.strip().lower()
         for item in self.index:
             if not query.isValid: break
             pos = item.title.lower().find(q)
             if pos < 0: continue
             result = item.to_albert_item()
-            yield (pos, result)
+            yield (pos, item.title, result)
+
+    def find_results_dir(self, query):
+        head, tail = query.string, ""
+        if not os.path.isdir(head):
+            head, tail = os.path.split(query.string)
+        q = tail.strip().lower()
+        for entry in os.scandir(head):
+            if not query.isValid: break
+            pos = entry.name.lower().find(q)
+            if pos < 0: continue
+            item = IndexItem(entry.path)
+            result = item.to_albert_item()
+            yield (pos, item.title, result)
 
     def handle_query(self, query):
         q = query.string.strip().lower()
         if len(q) < self.conf["min_length"]: return []
         results = list(self.find_results(query))
-        results.sort(key=lambda x: x[0])
-        return [x[1] for x in results]
+        results.sort(key=lambda x: (x[0], x[1]))
+        return [x[2] for x in results]
 
     def read_conf(self):
         directory = albert.configLocation()
