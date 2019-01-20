@@ -32,9 +32,12 @@ except ImportError:
     # The albert module is only available when running via Albert.
     # Use a mock object to allow testing outside Albert.
     class albert:
-        configLocation = lambda: os.path.expanduser("~/.config/albert")
-        iconLookup = lambda name: ""
-        debug = info = warning = critical = print
+        def configLocation():
+            return os.path.expanduser("~/.config/albert")
+        def iconLookup(name):
+            return None
+        def info(text):
+            print(text)
 
 __iid__ = "PythonInterface/v0.2"
 __prettyname__ = "Filex"
