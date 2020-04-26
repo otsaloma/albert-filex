@@ -22,9 +22,16 @@ import json
 import os
 import threading
 import time
+import traceback
 import urllib.parse
 
-from gi.repository import Gio
+try:
+    from gi.repository import Gio
+    GIO = True
+except Exception:
+    traceback.print_exc()
+    print("Failed to load Gio, some things will be a bit off.")
+    GIO = False
 
 try:
     import albertv0 as albert
@@ -46,6 +53,13 @@ __trigger__ = "filex "
 __author__ = "Osmo Salomaa"
 __dependencies__ = []
 
+SPECIAL_ICONS = {
+    # See 'gio info ...' at the command line.
+    "computer:///": "computer",
+    "recent:///": "document-open-recent",
+    "trash:///": "user-trash",
+}
+
 
 class IndexItem:
 
@@ -53,12 +67,24 @@ class IndexItem:
         if os.path.exists(path_or_uri):
             path_or_uri = urllib.parse.quote(path_or_uri)
             path_or_uri = "file://{}".format(path_or_uri)
-        file = Gio.File.new_for_uri(path_or_uri)
-        self.path = file.get_path() or ""
-        self.uri = file.get_uri() or ""
-        info = file.query_info("*", Gio.FileQueryInfoFlags.NONE, None)
-        self.title = info.get_display_name() or ""
-        self._icon = self.resolve_icon(info.get_icon().get_names())
+        if GIO:
+            file = Gio.File.new_for_uri(path_or_uri)
+            info = file.query_info("*", Gio.FileQueryInfoFlags.NONE, None)
+            self.uri = file.get_uri() or ""
+            self.path = file.get_path() or ""
+            self.title = info.get_display_name() or ""
+            self._icon = self.resolve_icon(*info.get_icon().get_names())
+        else:
+            if path_or_uri.endswith(":///"):
+                self.uri = path_or_uri
+                self.path = ""
+                self.title = self.uri.rstrip(":/").capitalize()
+                self._icon = self.resolve_icon(SPECIAL_ICONS.get(self.uri, ""))
+            else:
+                self.uri = path_or_uri
+                self.path = urllib.parse.urlsplit(urllib.parse.unquote(path_or_uri))[2]
+                self.title = os.path.basename(self.path.rstrip("/"))
+                self._icon = self.resolve_icon()
 
     def __repr__(self):
         return "IndexItem(title={!r}, uri={!r})".format(self.title, self.uri)
@@ -73,19 +99,19 @@ class IndexItem:
 
     @property
     def icon(self):
-        if self.uri.startswith("trash://"):
+        if self.uri.startswith("trash://") and GIO:
             # Avoid using an outdated empty/full icon for Trash.
             file = Gio.File.new_for_uri(self.uri)
             info = file.query_info("*", Gio.FileQueryInfoFlags.NONE, None)
-            return self.resolve_icon(info.get_icon().get_names())
+            return self.resolve_icon(*info.get_icon().get_names())
         return self._icon
 
-    def resolve_icon(self, names):
-        for name in names:
+    def resolve_icon(self, *names):
+        for name in filter(None, names):
             icon = albert.iconLookup(name)
             if icon: return icon
         if not self.path: return ""
-        name = "folder" if os.path.isdir(self.path) else "text-plain"
+        name = "folder" if os.path.isdir(self.path) else "text-x-generic"
         return albert.iconLookup(name)
 
     def to_albert_item(self):
